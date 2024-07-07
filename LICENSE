@@ -1,4 +1,4 @@
-MIT License
+MIT License [Modified]
 
 Copyright (c) 2024 Rohit Rawat
 
@@ -6,7 +6,7 @@ Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights
 to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
+NON-COMMERCIAL copies of the Software, and to permit persons to whom the Software is
 furnished to do so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
@@ -19,3 +19,18 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+
+# Evaluation License
+
+This code is provided to Steps AI for evaluation purposes only as part of the hiring process for Rohit Rawat. The following terms and conditions apply:
+
+1. Non-Commercial Use: The code is provided strictly for evaluation and non-commercial purposes. No commercial use, distribution, or exploitation of this code is permitted.
+
+2. **No Modification**: The code may not be modified or used to create derivative commercial works without explicit permission from Rohit Rawat.
+
+3. **Attribution**: Proper attribution must be given to Rohit Rawat in any discussions, reviews, or demonstrations involving this code.
+
+4. **Termination**: The license is valid for the duration of the evaluation process. Steps AI must destroy all copies of the code upon completion of the evaluation or at the request of Rohit Rawat.
+
+© Rohit Rawat 2024. All rights reserved.
