@@ -1,0 +1,7 @@
+whisper
+gradio
+moviepy
+numpy
+pandas
+torch
+transformers
