@@ -1,4 +1,3 @@
-# Configuration with RAG settings
 from dotenv import load_dotenv
 import os
 
@@ -26,6 +25,13 @@ DEFAULT_CHUNK_SIZE = int(os.getenv("DEFAULT_CHUNK_SIZE", "5"))  # sentences per 
 # Storage Configuration
 TRANSCRIPT_STORAGE_DIR = os.getenv("TRANSCRIPT_STORAGE_DIR", "data/transcripts")
 CLIPS_OUTPUT_DIR = os.getenv("CLIPS_OUTPUT_DIR", "data/clips")
+VIDEO_STORAGE_DIR = os.getenv("VIDEO_STORAGE_DIR", "data/videos")
+
+# Video Processing Configuration
+VIDEO_CODEC = os.getenv("VIDEO_CODEC", "libx264")  # Video codec for clips
+AUDIO_CODEC = os.getenv("AUDIO_CODEC", "aac")  # Audio codec for clips
+VIDEO_BITRATE = os.getenv("VIDEO_BITRATE", None)  # Optional: e.g., "5000k"
+CLIP_FADE_DURATION = float(os.getenv("CLIP_FADE_DURATION", "0"))  # Fade in/out duration in seconds
 
 # Server Configuration
 FLASK_PORT = int(os.getenv("FLASK_PORT", "5000"))
@@ -36,20 +42,29 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-pro")
 GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.7"))
 GEMINI_MAX_TOKENS = int(os.getenv("GEMINI_MAX_TOKENS", "2048"))
 
+# Clip Extraction Settings
+MAX_CLIP_DURATION = int(os.getenv("MAX_CLIP_DURATION", "300"))  # Maximum clip duration in seconds
+MIN_CLIP_DURATION = float(os.getenv("MIN_CLIP_DURATION", "1"))  # Minimum clip duration in seconds
+AUTO_COMPILE_THRESHOLD = int(os.getenv("AUTO_COMPILE_THRESHOLD", "3"))  # Auto-compile if >= this many clips
+
 # Create necessary directories
 os.makedirs(TRANSCRIPT_STORAGE_DIR, exist_ok=True)
 os.makedirs(CLIPS_OUTPUT_DIR, exist_ok=True)
+os.makedirs(VIDEO_STORAGE_DIR, exist_ok=True)
 
 # Validation
 if not GEMINI_API_KEY:
     print("⚠️  WARNING: GEMINI_API_KEY not set. AI analysis features will not work.")
     print("   Set it in your .env file: GEMINI_API_KEY=your_key_here")
 
-print("✅ ClipScribe Phase 2 Configuration Loaded")
+print("✅ ClipScribe Phase 3 Configuration Loaded")
 print(f"📁 Transcript Storage: {TRANSCRIPT_STORAGE_DIR}")
+print(f"📁 Video Storage: {VIDEO_STORAGE_DIR}")
 print(f"📁 Clips Output: {CLIPS_OUTPUT_DIR}")
 print(f"🎙️  Whisper Model: {WHISPER_MODEL_SIZE}")
 print(f"🔍 Embedding Model: {EMBEDDING_MODEL_NAME}")
 print(f"🤖 Gemini Model: {GEMINI_MODEL}")
 print(f"📊 Default Top-K Results: {DEFAULT_TOP_K}")
 print(f"🎯 Similarity Threshold: {SIMILARITY_THRESHOLD}")
+print(f"✂️  Max Clip Duration: {MAX_CLIP_DURATION}s")
+print(f"🎬 Video Codec: {VIDEO_CODEC}")

@@ -1,16 +1,17 @@
-# RAG with Embeddings & Semantic Search
 import os
 import json
 import tempfile
 import numpy as np
 from pathlib import Path
 import moviepy.editor as mp
+from moviepy.video.io.VideoFileClip import VideoFileClip
 import whisper
 import nltk
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
 import google.generativeai as genai
-from src.config import GEMINI_API_KEY
+from src.config import GEMINI_API_KEY, CLIPS_OUTPUT_DIR, TRANSCRIPT_STORAGE_DIR
+import shutil
 
 # Download required NLTK data
 try:
@@ -127,16 +128,30 @@ def create_embeddings_for_chunks(chunks):
     texts = [chunk['text'] for chunk in chunks]
     embeddings = model.encode(texts, show_progress_bar=True)
     
-    # Add embeddings to chunks
     for i, chunk in enumerate(chunks):
         chunk['embedding'] = embeddings[i].tolist()
     
     print(f"Created embeddings for {len(chunks)} chunks")
     return chunks
 
-def save_transcript_chunks(video_id, chunks, storage_dir="data/transcripts"):
-    """Save transcript chunks with embeddings to disk"""
+def save_transcript_chunks(video_id, chunks, storage_dir=None, video_path=None):
+    """Save transcript chunks with embeddings and video path reference"""
+    if storage_dir is None:
+        storage_dir = TRANSCRIPT_STORAGE_DIR
+    
     Path(storage_dir).mkdir(parents=True, exist_ok=True)
+    
+    # Copy video to data directory for future clip extraction
+    if video_path and os.path.exists(video_path):
+        video_storage_dir = os.path.join("data", "videos")
+        Path(video_storage_dir).mkdir(parents=True, exist_ok=True)
+        
+        video_ext = os.path.splitext(video_path)[1]
+        stored_video_path = os.path.join(video_storage_dir, f"{video_id}{video_ext}")
+        
+        if not os.path.exists(stored_video_path):
+            shutil.copy2(video_path, stored_video_path)
+            print(f"Copied video to {stored_video_path}")
     
     output_path = os.path.join(storage_dir, f"{video_id}.json")
     
@@ -144,14 +159,18 @@ def save_transcript_chunks(video_id, chunks, storage_dir="data/transcripts"):
         json.dump({
             'video_id': video_id,
             'chunks': chunks,
-            'total_chunks': len(chunks)
+            'total_chunks': len(chunks),
+            'video_path': stored_video_path if video_path else None
         }, f, indent=2, ensure_ascii=False)
     
     print(f"Saved {len(chunks)} chunks with embeddings to {output_path}")
     return output_path
 
-def load_transcript_chunks(video_id, storage_dir="data/transcripts"):
+def load_transcript_chunks(video_id, storage_dir=None):
     """Load previously saved transcript chunks with embeddings"""
+    if storage_dir is None:
+        storage_dir = TRANSCRIPT_STORAGE_DIR
+    
     file_path = os.path.join(storage_dir, f"{video_id}.json")
     
     if not os.path.exists(file_path):
@@ -165,38 +184,19 @@ def load_transcript_chunks(video_id, storage_dir="data/transcripts"):
     return data
 
 def semantic_search_chunks(query, chunks, top_k=5):
-    """
-    Perform semantic search on transcript chunks using RAG
-    
-    Args:
-        query: Search query string
-        chunks: List of chunks with embeddings
-        top_k: Number of top results to return
-    
-    Returns:
-        List of most relevant chunks with similarity scores
-    """
+    """Perform semantic search on transcript chunks using RAG"""
     print(f"Performing semantic search for: '{query}'")
     model = get_embedding_model()
     
-    # Create embedding for query
     query_embedding = model.encode([query])[0]
-    
-    # Extract embeddings from chunks
     chunk_embeddings = np.array([chunk['embedding'] for chunk in chunks])
-    
-    # Calculate cosine similarity
     similarities = cosine_similarity([query_embedding], chunk_embeddings)[0]
-    
-    # Get top k indices
     top_indices = np.argsort(similarities)[::-1][:top_k]
     
-    # Prepare results
     results = []
     for idx in top_indices:
         chunk = chunks[idx].copy()
         chunk['similarity'] = float(similarities[idx])
-        # Remove embedding from result (too large)
         chunk.pop('embedding', None)
         results.append(chunk)
     
@@ -204,17 +204,7 @@ def semantic_search_chunks(query, chunks, top_k=5):
     return results
 
 def analyze_with_gemini(full_transcript, instruction, chunks=None):
-    """
-    Analyze video content using Gemini AI
-    
-    Args:
-        full_transcript: Complete transcript text
-        instruction: User's analysis instruction
-        chunks: Optional list of chunks with timestamps
-    
-    Returns:
-        AI-generated analysis
-    """
+    """Analyze video content using Gemini AI"""
     print(f"Analyzing with Gemini: '{instruction}'")
     
     try:
@@ -240,24 +230,177 @@ Please provide a detailed analysis based on the instruction. If relevant, refere
         return error_msg
 
 def find_relevant_moments(query, video_id, threshold=0.5):
-    """
-    Find all moments in a video relevant to a query above a similarity threshold
-    
-    Args:
-        query: Search query
-        video_id: Video identifier
-        threshold: Minimum similarity score (0-1)
-    
-    Returns:
-        List of relevant moments with timestamps
-    """
+    """Find all moments in a video relevant to a query above a similarity threshold"""
     data = load_transcript_chunks(video_id)
     if not data:
         return []
     
-    # Get all chunks above threshold
     all_results = semantic_search_chunks(query, data['chunks'], top_k=len(data['chunks']))
     relevant_moments = [r for r in all_results if r['similarity'] >= threshold]
     
     print(f"Found {len(relevant_moments)} moments above threshold {threshold}")
     return relevant_moments
+
+def get_video_path(video_id):
+    """Get the stored video path for a given video_id"""
+    data = load_transcript_chunks(video_id)
+    if not data:
+        return None
+    
+    video_path = data.get('video_path')
+    
+    if video_path and os.path.exists(video_path):
+        return video_path
+    
+    # Fallback: search in videos directory
+    video_dir = os.path.join("data", "videos")
+    if os.path.exists(video_dir):
+        for file in os.listdir(video_dir):
+            if file.startswith(video_id):
+                return os.path.join(video_dir, file)
+    
+    print(f"Video file not found for {video_id}")
+    return None
+
+def extract_clip_from_video(video_path, start_time, end_time, video_id, clip_name=None):
+    """
+    Extract a clip from video based on start and end timestamps
+    
+    Args:
+        video_path: Path to source video
+        start_time: Start time in seconds
+        end_time: End time in seconds
+        video_id: Video identifier
+        clip_name: Optional custom name for the clip
+    
+    Returns:
+        Path to the extracted clip
+    """
+    print(f"Extracting clip from {start_time}s to {end_time}s...")
+    
+    Path(CLIPS_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    
+    # Generate clip filename
+    if clip_name:
+        clip_filename = f"{video_id}_{clip_name}.mp4"
+    else:
+        clip_filename = f"{video_id}_clip_{start_time:.0f}_{end_time:.0f}.mp4"
+    
+    clip_path = os.path.join(CLIPS_OUTPUT_DIR, clip_filename)
+    
+    # Load video and extract clip
+    video = VideoFileClip(video_path)
+    clip = video.subclip(start_time, end_time)
+    
+    # Write clip to file
+    clip.write_videofile(clip_path, codec='libx264', audio_codec='aac', verbose=False, logger=None)
+    
+    # Clean up
+    clip.close()
+    video.close()
+    
+    print(f"Clip saved to {clip_path}")
+    return clip_path
+
+def compile_clips(video_path, clips_info, video_id, output_name=None):
+    """
+    Compile multiple clips into a single video
+    
+    Args:
+        video_path: Path to source video
+        clips_info: List of (start_time, end_time) tuples
+        video_id: Video identifier
+        output_name: Optional custom name for compilation
+    
+    Returns:
+        Path to the compiled video
+    """
+    print(f"Compiling {len(clips_info)} clips into single video...")
+    
+    Path(CLIPS_OUTPUT_DIR).mkdir(parents=True, exist_ok=True)
+    
+    # Generate compilation filename
+    if output_name:
+        compilation_filename = f"{video_id}_{output_name}_compilation.mp4"
+    else:
+        compilation_filename = f"{video_id}_compilation_{len(clips_info)}_clips.mp4"
+    
+    compilation_path = os.path.join(CLIPS_OUTPUT_DIR, compilation_filename)
+    
+    # Load video
+    video = VideoFileClip(video_path)
+    
+    # Extract all clips
+    clips = []
+    for start_time, end_time in clips_info:
+        clip = video.subclip(start_time, end_time)
+        clips.append(clip)
+    
+    # Concatenate clips
+    final_clip = mp.concatenate_videoclips(clips, method="compose")
+    
+    # Write compilation to file
+    final_clip.write_videofile(compilation_path, codec='libx264', audio_codec='aac', verbose=False, logger=None)
+    
+    # Clean up
+    for clip in clips:
+        clip.close()
+    final_clip.close()
+    video.close()
+    
+    print(f"Compilation saved to {compilation_path}")
+    return compilation_path
+
+def extract_clips_from_search(video_id, query, top_k=5, compile_output=True):
+    """
+    High-level function: search for content and extract clips
+    
+    Args:
+        video_id: Video identifier
+        query: Search query
+        top_k: Number of clips to extract
+        compile_output: Whether to compile clips into single video
+    
+    Returns:
+        Dictionary with clip paths and metadata
+    """
+    # Search for relevant content
+    data = load_transcript_chunks(video_id)
+    if not data:
+        return {"error": f"Video {video_id} not found"}
+    
+    results = semantic_search_chunks(query, data['chunks'], top_k=top_k)
+    
+    # Get video path
+    video_path = get_video_path(video_id)
+    if not video_path:
+        return {"error": f"Video file for {video_id} not found"}
+    
+    # Extract individual clips
+    clip_paths = []
+    clips_info = []
+    
+    for i, result in enumerate(results, 1):
+        clip_path = extract_clip_from_video(
+            video_path, 
+            result['start_time'], 
+            result['end_time'],
+            video_id,
+            clip_name=f"search_{i}"
+        )
+        clip_paths.append(clip_path)
+        clips_info.append((result['start_time'], result['end_time']))
+    
+    # Optionally compile all clips
+    compilation_path = None
+    if compile_output and len(clips_info) > 1:
+        compilation_path = compile_clips(video_path, clips_info, video_id, f"search_{query[:20]}")
+    
+    return {
+        "video_id": video_id,
+        "query": query,
+        "individual_clips": clip_paths,
+        "compilation": compilation_path,
+        "clips_info": clips_info,
+        "search_results": results
+    }
