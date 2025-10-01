@@ -5,3 +5,5 @@ numpy
 pandas
 torch
 transformers
+python-dotenv
+nltk
