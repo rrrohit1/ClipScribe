@@ -1,81 +1,129 @@
 # ClipScribe
 
-## Overview
+**AI-powered video transcription and semantic search tool**
 
-**ClipScribe** is a tool for extracting meaningful short clips from videos based on transcript analysis. It leverages OpenAI's Whisper model to transcribe video audio, segments the transcript into manageable chunks, and allows users to retrieve or generate short video clips based on specific instructions or queries. The transcript chunks are saved for future use, enabling efficient retrieval using Retrieval-Augmented Generation (RAG) techniques. The final output can be a summarized report of relevant information found in the script, a generated short film, or both.
+ClipScribe transcribes videos using Whisper AI, creates searchable transcript chunks with embeddings, and enables intelligent content discovery through semantic search and AI analysis.
+
+## Features
+
+- Whisper AI transcription with precise timestamps
+- Intelligent sentence-based chunking with embeddings
+- Semantic search using vector embeddings
+- Gemini AI-powered content analysis
+- Relevance-based ranking with similarity scores
+- Persistent JSON storage for transcripts
+- REST API and interactive web interface
+
+## Quick Start
+
+### Installation
+
+```bash
+git clone https://github.com/rrrohit1/ClipScribe.git
+cd ClipScribe
+conda env create -f environment.yaml
+conda activate clipscribe
+```
+
+### Environment Setup
+
+Create a `.env` file:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+WHISPER_MODEL_SIZE=turbo
+DEFAULT_CHUNK_SIZE=5
+```
+
+### Run the Application
+
+```bash
+python app.py
+```
+
+Access the interface at `http://localhost:7860`
+
+## Usage Workflow
+
+1. **Process Video**: Upload video → Get transcription with embeddings
+2. **Search Content**: Query by topic → Find relevant segments with timestamps
+3. **Analyze**: Ask AI to summarize or analyze specific aspects
 
 ## Project Structure
 
 ```
-ClipScribe
-├── src
-│   ├── main.py        # Command line script for processing videos and generating clips
-│   ├── app.py         # Gradio app for interactive use
-│   └── utils.py       # Utility functions for audio extraction, transcription, and chunking
-├── requirements.txt    # Project dependencies
-└── README.md           # Project documentation
+ClipScribe/
+├── app.py              # Flask API + Gradio UI
+├── src/
+│   ├── utils.py        # Core processing functions
+│   └── config.py       # Configuration & environment variables
+├── data/
+│   ├── transcripts/    # Stored transcript chunks with embeddings
+│   └── clips/          # Generated video clips
+└── environment.yaml
 ```
 
-## Installation
+## API Endpoints
 
-Clone the repository and install the required dependencies:
+### POST /transcribe
+
+Process video and create searchable transcript
 
 ```bash
-git clone <repository-url>
-cd ClipScribe
-pip install -r requirements.txt
+curl -X POST -F "video=@video.mp4" http://localhost:5000/transcribe
 ```
 
-Or, to use a Conda environment with Python 3.11:
+### POST /search
+
+Semantic search in transcript
 
 ```bash
-conda create -n ClipScribe python=3.11
-conda activate ClipScribe
-pip install -r requirements.txt
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"video_id":"my_video","query":"machine learning","top_k":5}' \
+  http://localhost:5000/search
 ```
 
-## Usage
+### POST /analyze
 
-### Command Line Interface
-
-To process a video and extract relevant clips or summaries based on a user instruction, run:
+AI-powered content analysis
 
 ```bash
-python src/main.py <path_to_video_file> --instruction "<your_query_or_instruction>"
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"video_id":"my_video","instruction":"Summarize key points"}' \
+  http://localhost:5000/analyze
 ```
-
-- This will transcribe the video, segment the transcript, and either generate a short film or summarize the relevant information found in the script according to your instruction.
-- Transcript chunks are saved for future retrieval and RAG-based search.
-
-### Gradio App
-
-To launch the interactive Gradio app:
-
-```bash
-python src/app.py
-```
-
-- Upload a video, enter your instruction or query, and receive either a generated short clip or a summary of the relevant content.
-
-## Features
-
-- **Transcript Chunking:** Segments transcripts for efficient retrieval and RAG workflows.
-- **Clip Generation:** Extracts and saves short video clips based on transcript relevance.
-- **Summarization:** Summarizes information found in the script according to user instructions.
-- **Persistent Storage:** Saves transcript chunks for future use and retrieval.
 
 ## Dependencies
 
-- OpenAI Whisper (for transcription)
-- Gradio (for web interface)
-- MoviePy (for video/audio processing)
-- NLTK (for sentence chunking)
-- Other standard Python libraries
+- **whisper** - Audio transcription
+- **sentence-transformers** - Semantic embeddings
+- **google-generativeai** - Gemini AI integration
+- **moviepy** - Video/audio processing
+- **flask** - REST API
+- **gradio** - Web interface
+- **scikit-learn** - Similarity calculations
 
-## Contributing
+## Configuration
 
-Contributions are welcome! Please open an issue or submit a pull request for any improvements or features you'd like to add.
+Key settings in `src/config.py`:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WHISPER_MODEL_SIZE` | `turbo` | Whisper model (tiny/base/turbo) |
+| `EMBEDDING_MODEL_NAME` | `all-MiniLM-L6-v2` | Sentence transformer model |
+| `DEFAULT_CHUNK_SIZE` | `5` | Sentences per chunk |
+| `DEFAULT_TOP_K` | `5` | Search results to return |
+| `SIMILARITY_THRESHOLD` | `0.5` | Minimum relevance score |
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT License - See [LICENSE](LICENSE) file for details
+
+## Contributing
+
+Contributions welcome! Open an issue or submit a pull request.
+
+---
+
+**Current capabilities:** Video transcription, semantic search, AI-powered analysis
+```
