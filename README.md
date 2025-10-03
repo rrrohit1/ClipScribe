@@ -49,6 +49,35 @@ Access the interface at `http://localhost:7860`
 2. **Search Content**: Query by topic → Find relevant segments with timestamps
 3. **Analyze**: Ask AI to summarize or analyze specific aspects
 
+## Methodology
+
+### Semantic Chunking Process
+
+ClipScribe uses an intelligent approach to create meaningful chunks from video transcripts:
+
+1. **Sliding Window Approach**
+   - Uses a configurable window size (default: 4 sentences) with overlap
+   - Slides through the transcript with specified overlap (default: 2 sentences)
+   - Creates overlapping text segments for better context preservation
+
+2. **Semantic Analysis**
+   - Each chunk is embedded using Sentence Transformers (`all-MiniLM-L6-v2`)
+   - Calculates cosine similarity between consecutive chunks
+   - Creates a similarity score profile across the transcript
+
+3. **Optimal Chunking**
+   - Identifies local minima in similarity scores
+   - These minima represent natural "semantic breaks" in content
+   - Enforces constraints on chunk sizes:
+     - Minimum distance: 2 sentences (prevents too-small chunks)
+     - Maximum distance: 8 sentences (maintains digestible size)
+
+4. **Advantages**
+   - Creates context-aware chunks instead of fixed-size segments
+   - Preserves semantic coherence within chunks
+   - Enables more accurate search and retrieval
+   - Optimizes for both human readability and AI processing
+
 ## Project Structure
 
 ```
@@ -56,7 +85,8 @@ ClipScribe/
 ├── app.py              # Flask API + Gradio UI
 ├── src/
 │   ├── utils.py        # Core processing functions
-│   └── config.py       # Configuration & environment variables
+│   ├── config.py       # Configuration & environment variables
+│   └── create_chunks.py # Semantic chunking implementation
 ├── data/
 │   ├── transcripts/    # Stored transcript chunks with embeddings
 │   └── clips/          # Generated video clips
