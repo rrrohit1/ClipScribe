@@ -21,6 +21,8 @@ SIMILARITY_THRESHOLD = float(os.getenv("SIMILARITY_THRESHOLD", "0.5"))  # Min si
 
 # Transcript Chunking
 DEFAULT_CHUNK_SIZE = int(os.getenv("DEFAULT_CHUNK_SIZE", "5"))  # sentences per chunk
+WINDOW_SIZE = int(os.getenv("WINDOW_SIZE", "4"))  # Size of sliding window
+OVERLAP = int(os.getenv("OVERLAP", "2"))  # Overlap between consecutive windows
 
 # Storage Configuration
 TRANSCRIPT_STORAGE_DIR = os.getenv("TRANSCRIPT_STORAGE_DIR", "data/transcripts")
