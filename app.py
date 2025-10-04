@@ -1,4 +1,3 @@
-from flask import Flask, request, jsonify, send_file
 import gradio as gr
 from src.utils import (
     extract_audio, transcribe_audio_with_whisper, 
@@ -10,18 +9,25 @@ from src.utils import (
 import os
 import tempfile
 import json
-
-app = Flask(__name__)
+from pathlib import Path
 
 def process_video(video_file):
     """Process video: extract audio, transcribe, chunk, embed, and store"""
-    audio_file = extract_audio(video_file)
+    if video_file is None:
+        return {"error": "No video file provided"}
+    
+    # Get the video path
+    video_path = str(Path(video_file.name))
+    
+    # Extract audio and transcribe
+    audio_file = extract_audio(video_path)
     transcript_segments = transcribe_audio_with_whisper(audio_file)
     chunks = chunk_transcript_with_timestamps(transcript_segments, chunk_size=5)
     chunks_with_embeddings = create_embeddings_for_chunks(chunks)
     
-    video_id = os.path.splitext(os.path.basename(video_file))[0]
-    save_transcript_chunks(video_id, chunks_with_embeddings, video_path=video_file)
+    # Generate video ID and save chunks
+    video_id = os.path.splitext(os.path.basename(video_path))[0]
+    save_transcript_chunks(video_id, chunks_with_embeddings, video_path=video_path)
     
     full_transcript = " ".join([seg['text'] for seg in transcript_segments])
     
@@ -95,91 +101,6 @@ def generate_compilation(video_id, search_results, output_name=None):
         "total_clips": len(clips_info),
         "clips": clips_info
     }
-
-@app.route("/transcribe", methods=["POST"])
-def transcribe():
-    """API endpoint for video transcription and processing"""
-    if 'video' not in request.files:
-        return jsonify({"error": "No video file provided"}), 400
-    
-    video_file = request.files['video']
-    
-    with tempfile.NamedTemporaryFile(delete=False, suffix=os.path.splitext(video_file.filename)[1]) as tmp:
-        video_file.save(tmp.name)
-        tmp_path = tmp.name
-    
-    try:
-        result = process_video(tmp_path)
-        result['chunks'] = [{k: v for k, v in chunk.items() if k != 'embedding'} 
-                           for chunk in result['chunks']]
-        return jsonify(result)
-    finally:
-        if os.path.exists(tmp_path):
-            os.remove(tmp_path)
-
-@app.route("/search", methods=["POST"])
-def search():
-    """API endpoint for semantic search in video transcripts"""
-    data = request.json
-    video_id = data.get('video_id')
-    query = data.get('query')
-    top_k = data.get('top_k', 5)
-    
-    if not video_id or not query:
-        return jsonify({"error": "video_id and query are required"}), 400
-    
-    result = search_video_content(video_id, query, top_k)
-    return jsonify(result)
-
-@app.route("/analyze", methods=["POST"])
-def analyze():
-    """API endpoint for AI-powered video content analysis"""
-    data = request.json
-    video_id = data.get('video_id')
-    instruction = data.get('instruction')
-    
-    if not video_id or not instruction:
-        return jsonify({"error": "video_id and instruction are required"}), 400
-    
-    result = analyze_video_content(video_id, instruction)
-    return jsonify(result)
-
-@app.route("/extract_clip", methods=["POST"])
-def extract_clip():
-    """API endpoint for extracting a single clip"""
-    data = request.json
-    video_id = data.get('video_id')
-    start_time = data.get('start_time')
-    end_time = data.get('end_time')
-    clip_name = data.get('clip_name')
-    
-    if not video_id or start_time is None or end_time is None:
-        return jsonify({"error": "video_id, start_time, and end_time are required"}), 400
-    
-    result = generate_clip(video_id, start_time, end_time, clip_name)
-    return jsonify(result)
-
-@app.route("/compile", methods=["POST"])
-def compile():
-    """API endpoint for compiling multiple clips"""
-    data = request.json
-    video_id = data.get('video_id')
-    search_results = data.get('search_results', [])
-    output_name = data.get('output_name')
-    
-    if not video_id or not search_results:
-        return jsonify({"error": "video_id and search_results are required"}), 400
-    
-    result = generate_compilation(video_id, search_results, output_name)
-    return jsonify(result)
-
-@app.route("/download_clip/<path:clip_path>", methods=["GET"])
-def download_clip(clip_path):
-    """Download a generated clip"""
-    full_path = os.path.join("data/clips", clip_path)
-    if os.path.exists(full_path):
-        return send_file(full_path, as_attachment=True)
-    return jsonify({"error": "Clip not found"}), 404
 
 # Gradio interfaces
 def gradio_process_video(video_file):
@@ -379,10 +300,8 @@ with gr.Blocks(title="ClipScribe - Phase 3") as iface:
                          outputs=[compile_output, compilation_path_output])
 
 if __name__ == "__main__":
-    import threading
-    
-    flask_thread = threading.Thread(target=lambda: app.run(debug=False, port=5000))
-    flask_thread.daemon = True
-    flask_thread.start()
-    
-    iface.launch(server_port=7860)
+    iface.launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        share=False
+    )
