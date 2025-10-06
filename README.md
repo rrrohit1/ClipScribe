@@ -80,16 +80,16 @@ ClipScribe uses an intelligent approach to create meaningful chunks from video t
 
 ## Project Structure
 
-```
+```bash
 ClipScribe/
-├── app.py              # Flask API + Gradio UI
+├── app.py               # Flask API + Gradio UI
 ├── src/
-│   ├── utils.py        # Core processing functions
-│   ├── config.py       # Configuration & environment variables
+│   ├── utils.py         # Core processing functions
+│   ├── config.py        # Configuration & environment variables
 │   └── create_chunks.py # Semantic chunking implementation
 ├── data/
-│   ├── transcripts/    # Stored transcript chunks with embeddings
-│   └── clips/          # Generated video clips
+│   ├── transcripts/     # Stored transcript chunks with embeddings
+│   └── clips/           # Generated video clips
 └── environment.yaml
 ```
 
