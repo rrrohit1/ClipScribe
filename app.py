@@ -1,4 +1,5 @@
 import gradio as gr
+import pandas as pd
 from src.utils import (
     extract_audio, transcribe_audio_with_whisper, 
     chunk_transcript_with_timestamps, save_transcript_chunks,
@@ -6,10 +7,13 @@ from src.utils import (
     semantic_search_chunks, analyze_with_gemini,
     extract_clip_from_video, compile_clips, get_video_path
 )
+from src.create_chunks import create_chunks_with_sliding_window, find_local_minima
+from src.create_video import create_clips_from_dataframe
 import os
 import tempfile
 import json
 from pathlib import Path
+import numpy as np
 
 def process_video(video_file):
     """Process video: extract audio, transcribe, chunk, embed, and store"""
@@ -103,14 +107,35 @@ def generate_compilation(video_id, search_results, output_name=None):
     }
 
 # Gradio interfaces
-def gradio_process_video(video_file):
-    """Gradio interface for video processing"""
+def gradio_process_video(video_file, use_semantic_chunking=False):
+    """Gradio interface for video processing with optional semantic chunking"""
     if video_file is None:
         return "Please upload a video file."
     
     result = process_video(video_file.name)
     
-    output = f"""
+    if use_semantic_chunking:
+        # Create semantic chunks
+        sentences = result['full_transcript'].split('. ')
+        chunks, similarity_scores = create_chunks_with_sliding_window(sentences)
+        chunk_boundaries = find_local_minima(similarity_scores)
+        
+        output = f"""
+**Video ID:** {result['video_id']}
+
+**Processing Summary:**
+- Total semantic chunks created: {len(chunks)}
+- Chunk boundaries found at: {chunk_boundaries}
+- Average similarity score: {np.mean(similarity_scores):.3f}
+
+**Semantic Chunks:**
+"""
+        for i, chunk in enumerate(chunks):
+            output += f"\nChunk {i+1}:\n" + " ".join(chunk)
+            if i < len(similarity_scores):
+                output += f"\nSimilarity with next chunk: {similarity_scores[i]:.3f}\n---"
+    else:
+        output = f"""
 **Video ID:** {result['video_id']}
 
 **Processing Summary:**
@@ -119,9 +144,9 @@ def gradio_process_video(video_file):
 
 **Full Transcript:**
 {result['full_transcript'][:1000]}...
-
-✅ Video processed successfully! Use the Search or Analyze tabs to explore content.
 """
+    
+    output += "\n\n✅ Video processed successfully! Use the Search or Analyze tabs to explore content."
     return output
 
 def gradio_search_video(video_id, query, top_k):
@@ -202,33 +227,56 @@ You can download the clip using the file path above.
         return "Invalid time values. Please enter numbers.", None
 
 def gradio_compile_clips(video_id, search_results_json, output_name):
-    """Gradio interface for compiling multiple clips"""
+    """Gradio interface for compiling multiple clips using semantic chunking"""
     if not video_id or not search_results_json:
         return "Please provide Video ID and search results.", None
     
     try:
         search_results = json.loads(search_results_json)
         
-        result = generate_compilation(video_id, search_results, output_name if output_name else None)
+        # Create DataFrame for clips
+        df = pd.DataFrame({
+            'start': [r['start_time'] for r in search_results],
+            'end': [r['end_time'] for r in search_results],
+            'text': [r['text'] for r in search_results]
+        })
         
-        if "error" in result:
-            return f"❌ Error: {result['error']}", None
+        # Get video path
+        video_path = get_video_path(video_id)
+        if not video_path:
+            return f"❌ Error: Video file for {video_id} not found", None
+        
+        # Create clips using new create_video module
+        clip_paths = create_clips_from_dataframe(
+            video_path=video_path,
+            df=df,
+            video_id=video_id,
+            output_name=output_name if output_name else None
+        )
+        
+        if not clip_paths:
+            return "❌ Error: Failed to create clips", None
         
         output = f"""
-✅ **Compilation created successfully!**
+✅ **Clips created successfully!**
 
-**Video ID:** {result['video_id']}
-**Total clips compiled:** {result['total_clips']}
-**Compilation saved to:** {result['compilation_path']}
+**Video ID:** {video_id}
+**Total clips created:** {len(clip_paths)}
 
-**Clips included:**
+**Generated Clips:**
 """
-        for i, (start, end) in enumerate(result['clips'], 1):
-            output += f"\n{i}. {start:.2f}s - {end:.2f}s ({end-start:.2f}s)"
+        for i, (path, row) in enumerate(zip(clip_paths, df.itertuples()), 1):
+            output += f"\n{i}. {row.start:.2f}s - {row.end:.2f}s ({row.end-row.start:.2f}s)"
+            output += f"\n   Text: {row.text[:100]}..."
+            output += f"\n   Path: {path}\n"
         
-        return output, result['compilation_path']
+        # Return the path to the first clip for preview
+        return output, clip_paths[0] if clip_paths else None
+        
     except json.JSONDecodeError:
         return "Invalid search results format.", None
+    except Exception as e:
+        return f"❌ Error: {str(e)}", None
 
 # Create Gradio interface with tabs
 with gr.Blocks(title="ClipScribe - Phase 3") as iface:
@@ -238,9 +286,14 @@ with gr.Blocks(title="ClipScribe - Phase 3") as iface:
     with gr.Tab("📤 Process Video"):
         with gr.Row():
             video_input = gr.Video(label="Upload Video")
+            use_semantic_chunking = gr.Checkbox(label="Use Semantic Chunking", value=False)
         process_btn = gr.Button("Process Video", variant="primary")
         process_output = gr.Textbox(label="Processing Result", lines=15)
-        process_btn.click(gradio_process_video, inputs=video_input, outputs=process_output)
+        process_btn.click(
+            gradio_process_video, 
+            inputs=[video_input, use_semantic_chunking], 
+            outputs=process_output
+        )
     
     with gr.Tab("🔍 Search Content"):
         with gr.Row():
