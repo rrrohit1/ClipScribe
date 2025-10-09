@@ -41,13 +41,24 @@ DEFAULT_CHUNK_SIZE=5
 python app.py
 ```
 
-Access the interface at `http://localhost:7860`
+Access the Gradio interface at `http://localhost:7860`
 
 ## Usage Workflow
 
-1. **Process Video**: Upload video → Get transcription with embeddings
-2. **Search Content**: Query by topic → Find relevant segments with timestamps
-3. **Analyze**: Ask AI to summarize or analyze specific aspects
+1. **Upload & Process**  
+   - Upload your video
+   - Choose semantic or standard chunking
+   - Get transcript and chunk analysis
+
+2. **Search & Analyze**  
+   - Search by topic or keyword
+   - Get AI-powered content analysis
+   - View semantic relationships between chunks
+
+3. **Create Clips**  
+   - Extract clips by timestamp
+   - Generate clips from search results
+   - Automatic clip organization with text context
 
 ## Methodology
 
@@ -82,46 +93,48 @@ ClipScribe uses an intelligent approach to create meaningful chunks from video t
 
 ```bash
 ClipScribe/
-├── app.py               # Flask API + Gradio UI
+├── app.py              # Gradio web interface
 ├── src/
-│   ├── utils.py         # Core processing functions
-│   ├── config.py        # Configuration & environment variables
-│   └── create_chunks.py # Semantic chunking implementation
+│   ├── utils.py        # Core processing functions
+│   ├── config.py       # Configuration & environment variables
+│   ├── create_chunks.py # Semantic chunking implementation
+│   └── create_video.py # Video clip generation
 ├── data/
-│   ├── transcripts/     # Stored transcript chunks with embeddings
-│   └── clips/           # Generated video clips
+│   ├── transcripts/    # Stored transcript chunks with embeddings
+│   └── clips/          # Generated video clips
 └── environment.yaml
 ```
 
-## API Endpoints
+## Interface Features
 
-### POST /transcribe
+### Process Video
 
-Process video and create searchable transcript
+- Upload your video file
+- Choose between standard or semantic chunking
+- Get instant transcript with chunk analysis
+- View similarity scores between chunks (with semantic chunking)
 
-```bash
-curl -X POST -F "video=@video.mp4" http://localhost:5000/transcribe
-```
+### Search Content
 
-### POST /search
+- Enter video ID from processing step
+- Type your search query
+- Adjust number of results (1-10)
+- Get relevant segments with timestamps
+- View similarity scores for each result
 
-Semantic search in transcript
+### AI Analysis
 
-```bash
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"video_id":"my_video","query":"machine learning","top_k":5}' \
-  http://localhost:5000/search
-```
+- Enter video ID and analysis instruction
+- Get AI-powered insights about your content
+- Receive suggested clips and timestamps
+- Extract key information and summaries
 
-### POST /analyze
+### Extract Clips
 
-AI-powered content analysis
-
-```bash
-curl -X POST -H "Content-Type: application/json" \
-  -d '{"video_id":"my_video","instruction":"Summarize key points"}' \
-  http://localhost:5000/analyze
-```
+- Create individual clips by timestamp
+- Name your clips for easy reference
+- Get instant preview of extracted segments
+- Automatic fade effects (configurable)
 
 ## Dependencies
 
